@@ -6,22 +6,48 @@
     "_generator": {
       "name": "bicep",
       "version": "0.36.1.42791",
-      "templateHash": "6045926537381406652"
+      "templateHash": "14499761204689641771"
     }
   },
   "parameters": {
-    "appRoleId": {
+    "uniqueName": {
       "type": "string",
-      "nullable": true,
       "metadata": {
-        "description": "ID of the application role to add to the resource app. Must be a GUID."
+        "description": "Unique name for the app registration."
       }
     },
-    "certKey": {
-      "type": "securestring",
-      "nullable": true,
+    "displayName": {
+      "type": "string",
       "metadata": {
-        "description": "Value of the key credential."
+        "description": "Display name for the app registration."
+      }
+    },
+    "permissionIdentifier": {
+      "type": "string",
+      "metadata": {
+        "description": "The permission identifier (ID) for the required permission."
+      }
+    },
+    "type": {
+      "type": "string",
+      "allowedValues": [
+        "Role",
+        "Scope"
+      ],
+      "metadata": {
+        "description": "The type of resource access, either \"Role\" or \"Scope\"."
+      }
+    },
+    "graphAppId": {
+      "type": "string",
+      "metadata": {
+        "description": "The application ID of the Microsoft Graph API."
+      }
+    },
+    "delegatedScope": {
+      "type": "string",
+      "metadata": {
+        "description": "The delegated scope for OAuth2 permission grants, required if type is \"Scope\"."
       }
     }
   },
@@ -32,43 +58,178 @@
     }
   },
   "resources": {
-    "resourceApp": {
-      "import": "microsoftGraphV1",
-      "type": "Microsoft.Graph/applications@v1.0",
+    "application": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "application",
       "properties": {
-        "uniqueName": "ExampleResourceApp",
-        "displayName": "Example Resource Application",
-        "appRoles": "[if(not(empty(parameters('appRoleId'))), createArray(createObject('id', parameters('appRoleId'), 'allowedMemberTypes', createArray('User', 'Application'), 'description', 'Read access to resource app data', 'displayName', 'ResourceAppData.Read.All', 'value', 'ResourceAppData.Read.All', 'isEnabled', true())), createArray())]"
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "uniqueName": {
+            "value": "[parameters('uniqueName')]"
+          },
+          "displayName": {
+            "value": "[parameters('displayName')]"
+          },
+          "permissionIdentifier": {
+            "value": "[parameters('permissionIdentifier')]"
+          },
+          "type": {
+            "value": "[parameters('type')]"
+          },
+          "graphAppId": {
+            "value": "[parameters('graphAppId')]"
+          },
+          "delegatedScope": {
+            "value": "[parameters('delegatedScope')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "2.1-experimental",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.36.1.42791",
+              "templateHash": "6170999938745297924"
+            }
+          },
+          "parameters": {
+            "uniqueName": {
+              "type": "string",
+              "metadata": {
+                "description": "Unique name for the app registration."
+              }
+            },
+            "displayName": {
+              "type": "string",
+              "metadata": {
+                "description": "Display name for the app registration."
+              }
+            },
+            "permissionIdentifier": {
+              "type": "string",
+              "metadata": {
+                "description": "The permission identifier (ID) for the required permission."
+              }
+            },
+            "type": {
+              "type": "string",
+              "allowedValues": [
+                "Role",
+                "Scope"
+              ],
+              "metadata": {
+                "description": "The type of resource access, either \"Role\" or \"Scope\"."
+              }
+            },
+            "graphAppId": {
+              "type": "string",
+              "metadata": {
+                "description": "The application ID of the Microsoft Graph API."
+              }
+            },
+            "delegatedScope": {
+              "type": "string",
+              "metadata": {
+                "description": "The delegated scope for OAuth2 permission grants, required if type is \"Scope\"."
+              }
+            }
+          },
+          "imports": {
+            "microsoftGraphV1": {
+              "provider": "MicrosoftGraph",
+              "version": "1.0.0"
+            }
+          },
+          "resources": {
+            "application": {
+              "import": "microsoftGraphV1",
+              "type": "Microsoft.Graph/applications@v1.0",
+              "properties": {
+                "uniqueName": "[parameters('uniqueName')]",
+                "displayName": "[parameters('displayName')]",
+                "requiredResourceAccess": [
+                  {
+                    "resourceAccess": [
+                      {
+                        "id": "[parameters('permissionIdentifier')]",
+                        "type": "[parameters('type')]"
+                      }
+                    ],
+                    "resourceAppId": "[parameters('graphAppId')]"
+                  }
+                ]
+              }
+            },
+            "applicationServicePrincipal": {
+              "import": "microsoftGraphV1",
+              "type": "Microsoft.Graph/servicePrincipals@v1.0",
+              "properties": {
+                "appId": "[reference('application').appId]"
+              },
+              "dependsOn": [
+                "application"
+              ]
+            },
+            "graphServicePrincipal": {
+              "existing": true,
+              "import": "microsoftGraphV1",
+              "type": "Microsoft.Graph/servicePrincipals@v1.0",
+              "properties": {
+                "appId": "[parameters('graphAppId')]"
+              }
+            },
+            "grants": {
+              "condition": "[equals(parameters('type'), 'Scope')]",
+              "import": "microsoftGraphV1",
+              "type": "Microsoft.Graph/oauth2PermissionGrants@v1.0",
+              "properties": {
+                "clientId": "[reference('applicationServicePrincipal').id]",
+                "consentType": "AllPrincipals",
+                "resourceId": "[reference('graphServicePrincipal').id]",
+                "scope": "[parameters('delegatedScope')]"
+              },
+              "dependsOn": [
+                "applicationServicePrincipal",
+                "graphServicePrincipal"
+              ]
+            },
+            "appRoleAssignment": {
+              "condition": "[equals(parameters('type'), 'Role')]",
+              "import": "microsoftGraphV1",
+              "type": "Microsoft.Graph/appRoleAssignedTo@v1.0",
+              "properties": {
+                "principalId": "[reference('applicationServicePrincipal').id]",
+                "resourceId": "[reference('graphServicePrincipal').id]",
+                "appRoleId": "[parameters('permissionIdentifier')]"
+              },
+              "dependsOn": [
+                "applicationServicePrincipal",
+                "graphServicePrincipal"
+              ]
+            }
+          },
+          "outputs": {
+            "applicationAppId": {
+              "type": "string",
+              "value": "[reference('application').appId]"
+            },
+            "applicationObjectId": {
+              "type": "string",
+              "value": "[reference('application').id]"
+            },
+            "applicationServicePrincipalId": {
+              "type": "string",
+              "value": "[reference('applicationServicePrincipal').id]"
+            }
+          }
+        }
       }
-    },
-    "resourceSp": {
-      "import": "microsoftGraphV1",
-      "type": "Microsoft.Graph/servicePrincipals@v1.0",
-      "properties": {
-        "appId": "[reference('resourceApp').appId]"
-      },
-      "dependsOn": [
-        "resourceApp"
-      ]
-    },
-    "clientApp": {
-      "import": "microsoftGraphV1",
-      "type": "Microsoft.Graph/applications@v1.0",
-      "properties": {
-        "uniqueName": "ExampleClientApp",
-        "displayName": "Example Client Application",
-        "keyCredentials": "[if(not(empty(parameters('certKey'))), createArray(createObject('displayName', 'Example Client App Key Credential', 'usage', 'Verify', 'type', 'AsymmetricX509Cert', 'key', parameters('certKey'))), createArray())]"
-      }
-    },
-    "clientSp": {
-      "import": "microsoftGraphV1",
-      "type": "Microsoft.Graph/servicePrincipals@v1.0",
-      "properties": {
-        "appId": "[reference('clientApp').appId]"
-      },
-      "dependsOn": [
-        "clientApp"
-      ]
     }
   }
 }
