@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "languageVersion": "2.1-experimental",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.36.1.42791",
+      "templateHash": "8997690245784044735"
+    }
+  },
+  "parameters": {
+    "appName": {
+      "type": "string",
+      "defaultValue": "MyBicepApp",
+      "metadata": {
+        "description": "The display name for your application"
+      }
+    },
+    "redirectUri": {
+      "type": "string",
+      "defaultValue": "https://myapp.com/login",
+      "metadata": {
+        "description": "The URI for the application login"
+      }
+    }
+  },
+  "imports": {
+    "microsoftGraphV1": {
+      "provider": "MicrosoftGraph",
+      "version": "1.0.0"
+    }
+  },
+  "resources": {
+    "appRegistration": {
+      "import": "microsoftGraphV1",
+      "type": "Microsoft.Graph/applications@v1.0",
+      "properties": {
+        "uniqueName": "[parameters('appName')]",
+        "displayName": "[parameters('appName')]",
+        "signInAudience": "AzureADMyOrg",
+        "web": {
+          "redirectUris": [
+            "[parameters('redirectUri')]"
+          ]
+        },
+        "requiredResourceAccess": [
+          {
+            "resourceAppId": "00000003-0000-0000-c000-000000000000",
+            "resourceAccess": [
+              {
+                "id": "e1fe6dd5-8c31-4d11-8a82-051444c03332",
+                "type": "Scope"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "servicePrincipal": {
+      "import": "microsoftGraphV1",
+      "type": "Microsoft.Graph/servicePrincipals@v1.0",
+      "properties": {
+        "appId": "[reference('appRegistration').appId]"
+      },
+      "dependsOn": [
+        "appRegistration"
+      ]
+    }
+  },
+  "outputs": {
+    "clientId": {
+      "type": "string",
+      "value": "[reference('appRegistration').appId]"
+    },
+    "servicePrincipalId": {
+      "type": "string",
+      "value": "[reference('servicePrincipal').id]"
+    }
+  }
+}
