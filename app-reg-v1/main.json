@@ -6,22 +6,22 @@
     "_generator": {
       "name": "bicep",
       "version": "0.36.1.42791",
-      "templateHash": "8997690245784044735"
+      "templateHash": "6045926537381406652"
     }
   },
   "parameters": {
-    "appName": {
+    "appRoleId": {
       "type": "string",
-      "defaultValue": "MyBicepApp",
+      "nullable": true,
       "metadata": {
-        "description": "The display name for your application"
+        "description": "ID of the application role to add to the resource app. Must be a GUID."
       }
     },
-    "redirectUri": {
-      "type": "string",
-      "defaultValue": "https://myapp.com/login",
+    "certKey": {
+      "type": "securestring",
+      "nullable": true,
       "metadata": {
-        "description": "The URI for the application login"
+        "description": "Value of the key credential."
       }
     }
   },
@@ -32,50 +32,43 @@
     }
   },
   "resources": {
-    "appRegistration": {
+    "resourceApp": {
       "import": "microsoftGraphV1",
       "type": "Microsoft.Graph/applications@v1.0",
       "properties": {
-        "uniqueName": "[parameters('appName')]",
-        "displayName": "[parameters('appName')]",
-        "signInAudience": "AzureADMyOrg",
-        "web": {
-          "redirectUris": [
-            "[parameters('redirectUri')]"
-          ]
-        },
-        "requiredResourceAccess": [
-          {
-            "resourceAppId": "00000003-0000-0000-c000-000000000000",
-            "resourceAccess": [
-              {
-                "id": "e1fe6dd5-8c31-4d11-8a82-051444c03332",
-                "type": "Scope"
-              }
-            ]
-          }
-        ]
+        "uniqueName": "ExampleResourceApp",
+        "displayName": "Example Resource Application",
+        "appRoles": "[if(not(empty(parameters('appRoleId'))), createArray(createObject('id', parameters('appRoleId'), 'allowedMemberTypes', createArray('User', 'Application'), 'description', 'Read access to resource app data', 'displayName', 'ResourceAppData.Read.All', 'value', 'ResourceAppData.Read.All', 'isEnabled', true())), createArray())]"
       }
     },
-    "servicePrincipal": {
+    "resourceSp": {
       "import": "microsoftGraphV1",
       "type": "Microsoft.Graph/servicePrincipals@v1.0",
       "properties": {
-        "appId": "[reference('appRegistration').appId]"
+        "appId": "[reference('resourceApp').appId]"
       },
       "dependsOn": [
-        "appRegistration"
+        "resourceApp"
       ]
-    }
-  },
-  "outputs": {
-    "clientId": {
-      "type": "string",
-      "value": "[reference('appRegistration').appId]"
     },
-    "servicePrincipalId": {
-      "type": "string",
-      "value": "[reference('servicePrincipal').id]"
+    "clientApp": {
+      "import": "microsoftGraphV1",
+      "type": "Microsoft.Graph/applications@v1.0",
+      "properties": {
+        "uniqueName": "ExampleClientApp",
+        "displayName": "Example Client Application",
+        "keyCredentials": "[if(not(empty(parameters('certKey'))), createArray(createObject('displayName', 'Example Client App Key Credential', 'usage', 'Verify', 'type', 'AsymmetricX509Cert', 'key', parameters('certKey'))), createArray())]"
+      }
+    },
+    "clientSp": {
+      "import": "microsoftGraphV1",
+      "type": "Microsoft.Graph/servicePrincipals@v1.0",
+      "properties": {
+        "appId": "[reference('clientApp').appId]"
+      },
+      "dependsOn": [
+        "clientApp"
+      ]
     }
   }
 }
